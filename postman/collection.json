@@ -1,0 +1,157 @@
+{
+  "info": {
+    "name": "Yoti Sandbox Demo",
+    "_postman_id": "11111111-1111-1111-1111-111111111111",
+    "description": "Create session \u2192 get result \u2192 trigger webhook \u2192 get result",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('Created', function(){ pm.expect(pm.response.code).to.be.oneOf([200,201]); });",
+              "const sid = json.session && json.session.id;",
+              "pm.environment.set('SESSION_ID', sid);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reference\": \"abc123\",\n  \"policy\": {\n    \"type\": \"age_over\",\n    \"age_threshold\": 18\n  }\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/sessions",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "sessions"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Result (before webhook)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/sessions/{{SESSION_ID}}/result",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "sessions",
+            "{{SESSION_ID}}",
+            "result"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Trigger Webhook (signed optional)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const secret = pm.environment.get('WEBHOOK_SHARED_SECRET') || '';",
+              "const payload = { event: 'verification_complete', session_id: pm.environment.get('SESSION_ID'), approved: true, reason: 'demo pass' };",
+              "const raw = JSON.stringify(payload);",
+              "pm.variables.set('REQUEST_BODY', raw);",
+              "function hmacSHA256(key, data) {",
+              "  const cryptoJS = require('crypto-js');",
+              "  const hash = cryptoJS.HmacSHA256(data, key);",
+              "  return cryptoJS.enc.Hex.stringify(hash);",
+              "}",
+              "const sig = secret ? hmacSHA256(secret, raw) : '';",
+              "pm.variables.set('HMAC_HEX', sig);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Signature",
+            "value": "sha256:{{HMAC_HEX}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{REQUEST_BODY}}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/webhook",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "webhook"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Result (after webhook)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/sessions/{{SESSION_ID}}/result",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "sessions",
+            "{{SESSION_ID}}",
+            "result"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "OpenAPI YAML",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/openapi.yaml",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "openapi.yaml"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
