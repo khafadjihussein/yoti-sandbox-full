@@ -1,0 +1,127 @@
+openapi: 3.0.3
+info:
+  title: Yoti-Style Age Verification Sandbox (Demo)
+  version: "0.1.0"
+  description: |
+    Minimal sandbox to simulate create-session, retrieve-result, and webhook notification flows.
+servers:
+  - url: http://localhost:5000
+
+paths:
+  /ping:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /sessions:
+    post:
+      summary: Create a mock age verification session
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reference:
+                  type: string
+                callback_url:
+                  type: string
+                  format: uri
+                policy:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: [age_over, age_under]
+                    age_threshold:
+                      type: integer
+                      example: 18
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      created_at: { type: string, format: date-time }
+                      status: { type: string, example: created }
+                      policy:
+                        type: object
+                        properties:
+                          type: { type: string }
+                          age_threshold: { type: integer }
+                      reference: { type: string, nullable: true }
+                      callback_url: { type: string, format: uri, nullable: true }
+                      ttl_seconds: { type: integer }
+                      expires_at: { type: string, format: date-time }
+
+  /sessions/{session_id}/result:
+    get:
+      summary: Retrieve sandbox result for a session
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      session_id: { type: string }
+                      status: { type: string, enum: [pending, complete] }
+                      outcome: { type: string, nullable: true, enum: [approved, rejected] }
+                      reason: { type: string, nullable: true }
+                      attributes:
+                        type: object
+                        properties:
+                          age_over: { type: boolean }
+                          age_threshold: { type: integer }
+        '404':
+          description: Not found
+
+  /webhook:
+    post:
+      summary: Receive provider notifications (e.g., verification_complete)
+      description: |
+        Accepts events like:
+        ```json
+        {
+          "event": "verification_complete",
+          "session_id": "uuid",
+          "approved": true,
+          "reason": "face match ok"
+        }
+        ```
+        If `WEBHOOK_SHARED_SECRET` is set, an `X-Signature: sha256=<hex>` header may be verified.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Acknowledge receipt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: boolean }
+                  verified: { type: boolean, nullable: true }
+                  json: { type: object }
